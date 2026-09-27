@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Вечерний сеанс · рулетка для двоих</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oranienbaum&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root{
+    --bg:#120a0c; --bg2:#1a0f13; --line:#3a2228;
+    --cream:#f0dfc8; --cream-dim:#b59d8b; --ink:#241016;
+    --red:#cf3345; --red-deep:#8e1f2e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{
+    background:var(--bg); color:var(--cream);
+    font-family:'Manrope',sans-serif;
+    min-height:100dvh; display:flex; flex-direction:column;
+    overflow-x:hidden;
+  }
+
+  /* ── плёночное зерно и виньетка: весь интерфейс как один «кадр» ── */
+  .grain{
+    position:fixed; inset:-120px; z-index:200; pointer-events:none; opacity:.08;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:grain .9s steps(7) infinite;
+  }
+  @keyframes grain{
+    0%{transform:translate(0,0)} 14%{transform:translate(-38px,22px)} 28%{transform:translate(24px,-40px)}
+    42%{transform:translate(-30px,-14px)} 56%{transform:translate(40px,30px)} 70%{transform:translate(-18px,44px)}
+    84%{transform:translate(28px,-26px)} 100%{transform:translate(0,0)}
+  }
+  .vignette{position:fixed; inset:0; z-index:190; pointer-events:none; box-shadow:inset 0 0 22vmax rgba(0,0,0,.72)}
+
+  /* ── шапка ── */
+  .top{display:flex;align-items:center;gap:16px;padding:16px 26px;border-bottom:1px solid #241318}
+  .rec{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.18em;color:#c65360;display:flex;align-items:center;gap:8px;min-width:150px}
+  .rec-dot{width:8px;height:8px;border-radius:50%;background:#e04a58;animation:blink 1.3s steps(2) infinite}
+  @keyframes blink{50%{opacity:.15}}
+  .brand{flex:1;text-align:center;font-family:'Oranienbaum',serif;font-size:19px;letter-spacing:.42em;text-indent:.42em;text-transform:uppercase}
+  .top-actions{display:flex;gap:8px;min-width:150px;justify-content:flex-end}
+  .icon-btn{width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--cream-dim);cursor:pointer;display:grid;place-items:center;transition:.2s}
+  .icon-btn:hover{color:var(--cream);border-color:#5c3540}
+  .icon-btn svg{width:17px;height:17px}
+
+  /* ── вьюхи ── */
+  main{flex:1;display:flex}
+  .view{margin:auto;width:100%;max-width:920px;padding:44px 22px 60px;display:flex;flex-direction:column;align-items:center;text-align:center;animation:viewIn .5s cubic-bezier(.22,.9,.3,1) both}
+  @keyframes viewIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+  .kicker{display:flex;align-items:center;gap:14px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--cream-dim);flex-wrap:wrap;justify-content:center}
+  .kline{width:34px;height:1px;background:#4a2b33}
+  .display{font-family:'Oranienbaum',serif;font-weight:400;font-size:clamp(38px,6.5vw,60px);line-height:1.08;margin:18px 0 6px}
+
+  /* ── колесо ── */
+  .wheel-stage{position:relative;margin-top:26px}
+  .spotlight{position:absolute;inset:-70px;pointer-events:none;background:radial-gradient(circle at 50% 45%,rgba(207,80,64,.09),transparent 62%)}
+  .wheel-wrap{position:relative;width:min(82vw,500px);aspect-ratio:1;filter:drop-shadow(0 24px 44px rgba(0,0,0,.55))}
+  #wheelSvg{width:100%;height:100%;display:block}
+  .sec{stroke:#120a0c;stroke-width:3}
+  .sec-a{fill:#efdec4}
+  .sec-b{fill:#2c1119}
+  .sec-c{fill:#77222f}
+  .sec.won{filter:brightness(1.22);stroke:var(--cream)}
+  .wtxt{font-family:'Oranienbaum',serif;letter-spacing:.04em}
+  .t-dark{fill:#241016}
+  .t-light{fill:#f0dfc8}
+  .pointer{position:absolute;top:-10px;left:50%;width:40px;z-index:6;pointer-events:none;transform-origin:50% 14%;transform:translateX(-50%)}
+  .pointer.kick{animation:kick .14s ease-out}
+  @keyframes kick{
+    0%{transform:translateX(-50%) rotate(0)}
+    40%{transform:translateX(-50%) rotate(-16deg)}
+    100%{transform:translateX(-50%) rotate(0)}
+  }
+  .hub{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:21%;aspect-ratio:1;border-radius:50%;z-index:5;
+    background:#1b0d12;border:2px solid var(--cream);color:var(--cream);cursor:pointer;
+    font-family:'Manrope',sans-serif;font-weight:700;font-size:clamp(11px,1.35vw,15px);letter-spacing:.16em;
+    transition:transform .18s,border-color .18s;
+  }
+  .hub:hover{transform:translate(-50%,-50%) scale(1.05);border-color:#e04a58}
+  .hub:active{transform:translate(-50%,-50%) scale(.95)}
+  .hub.is-spinning{pointer-events:none;opacity:.85;animation:hubPulse 1.2s infinite}
+  @keyframes hubPulse{50%{border-color:#e04a58}}
+
+  .session-info{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:26px;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.06em;color:var(--cream-dim)}
+  .session-info b{color:var(--cream);font-weight:500}
+  .dots{display:flex;gap:7px}
+  .dot{width:9px;height:9px;border-radius:50%;border:1px solid #53323c}
+  .dot.done{background:var(--red);border-color:var(--red)}
+  .remain-line{margin-top:12px;font-size:13px;color:#8d7368;max-width:680px;line-height:1.6}
+  .remain-line b{color:#a98d7e;font-weight:600}
+
+  /* ── фильм идёт ── */
+  .redline{width:64px;height:3px;background:var(--red);margin:20px auto 22px}
+  .whisper{font-size:16px;color:var(--cream-dim);max-width:520px;line-height:1.7;margin-bottom:34px}
+
+  /* ── кнопки ── */
+  .btn-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+  .btn{display:inline-flex;align-items:center;gap:10px;font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;
+    padding:14px 24px;border-radius:11px;cursor:pointer;border:1px solid transparent;
+    transition:transform .16s, box-shadow .16s, background .16s, border-color .16s}
+  .btn svg{width:17px;height:17px}
+  .btn-primary{background:var(--cream);color:var(--ink);box-shadow:0 4px 0 var(--red-deep)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 0 var(--red-deep)}
+  .btn-primary:active{transform:translateY(2px);box-shadow:0 1px 0 var(--red-deep)}
+  .btn-ghost{background:transparent;color:var(--cream);border-color:#4a2b33}
+  .btn-ghost:hover{border-color:var(--cream);background:rgba(240,223,200,.05)}
+
+  /* ── оверлей результата: «кадр» с кроп-маркерами камеры ── */
+  .overlay{position:fixed;inset:0;z-index:120;background:rgba(10,5,7,.8);backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:22px}
+  .frame{position:relative;width:100%;max-width:660px;background:var(--bg2);border:1px solid var(--line);padding:58px 44px 44px;animation:frameIn .45s cubic-bezier(.2,.9,.3,1.05) both}
+  @keyframes frameIn{from{opacity:0;transform:translateY(26px) scale(.97)}to{opacity:1;transform:none}}
+  .corner{position:absolute;width:20px;height:20px;border:2px solid var(--cream)}
+  .c1{top:10px;left:10px;border-right:0;border-bottom:0}
+  .c2{top:10px;right:10px;border-left:0;border-bottom:0}
+  .c3{bottom:10px;left:10px;border-right:0;border-top:0}
+  .c4{bottom:10px;right:10px;border-left:0;border-top:0}
+  .frame-kicker{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:#c65360;margin-bottom:18px}
+  .frame-title{font-family:'Oranienbaum',serif;font-size:clamp(38px,7vw,64px);line-height:1.1;margin-bottom:14px}
+  .frame-title span{display:inline-block;opacity:0;animation:letterIn .5s cubic-bezier(.2,.8,.25,1) forwards}
+  @keyframes letterIn{from{opacity:0;transform:translateY(20px) rotate(5deg);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+  .frame-sub{font-size:14px;color:var(--cream-dim);margin-bottom:34px}
+
+  /* ── билет-задание ── */
+  .ticket{display:flex;width:100%;max-width:660px;background:#f0e4cf;color:#2a141b;border-radius:14px;overflow:hidden;
+    box-shadow:0 26px 60px rgba(0,0,0,.5);margin:26px 0 30px;text-align:left}
+  .ticket.deal{animation:dealIn .55s cubic-bezier(.2,.85,.3,1.12) both}
+  @keyframes dealIn{from{opacity:0;transform:translateY(44px) rotate(-2deg)}to{opacity:1;transform:none}}
+  .ticket-stub{position:relative;width:128px;flex-shrink:0;background:#e6d3b6;border-right:2px dashed #b39a80;
+    display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:18px 10px}
+  .ticket-stub::before,.ticket-stub::after{content:'';position:absolute;right:-9px;width:16px;height:16px;border-radius:50%;background:var(--bg)}
+  .ticket-stub::before{top:-8px}
+  .ticket-stub::after{bottom:-8px}
+  .stub-no{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:#7d2536}
+  .stub-label{writing-mode:vertical-rl;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.42em;text-transform:uppercase;color:#8a6f57;flex:1;margin:12px 0;display:flex;align-items:center}
+  .barcode{width:56px;height:36px;background:repeating-linear-gradient(90deg,#2a141b 0 2px,transparent 2px 5px,#2a141b 5px 6px,transparent 6px 10px)}
+  .ticket-body{flex:1;padding:22px 28px;display:flex;flex-direction:column;min-width:0}
+  .ticket-head,.ticket-foot{display:flex;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8a6f57}
+  .ticket-head{border-bottom:1px dashed #c4ab8c;padding-bottom:10px}
+  .ticket-foot{border-top:1px dashed #c4ab8c;padding-top:10px;align-items:center}
+  .ticket-foot svg{width:14px;height:14px;color:#b3314a}
+  .ticket-task{font-family:'Oranienbaum',serif;font-size:clamp(24px,4.2vw,33px);line-height:1.28;flex:1;display:flex;align-items:center;padding:20px 0}
+
+  /* ── финал ── */
+  .finale-note{color:var(--cream-dim);font-size:15px;margin-bottom:14px;max-width:460px;line-height:1.7}
+  .finale-list{font-family:'Oranienbaum',serif;font-size:clamp(20px,3.6vw,30px);line-height:1.5;max-width:640px;margin-bottom:34px}
+
+  /* ── настройки ── */
+  .modal{width:100%;max-width:560px;background:var(--bg2);border:1px solid var(--line);padding:30px 30px 26px;animation:frameIn .4s both;max-height:88vh;overflow:auto}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .modal-head h2{font-family:'Oranienbaum',serif;font-weight:400;font-size:26px}
+  .modal label{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--cream-dim);margin:16px 0 8px}
+  .modal textarea{width:100%;background:#140b0e;border:1px solid var(--line);border-radius:9px;color:var(--cream);
+    font-family:'Manrope',sans-serif;font-size:14px;line-height:1.65;padding:12px 14px;resize:vertical;transition:border-color .2s}
+  .modal textarea:focus{outline:none;border-color:#7a3d49}
+  .hint{font-size:12px;color:#8d7368;margin:14px 0 18px}
+
+  /* ── тосты ── */
+  .toast-wrap{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center}
+  .toast{background:var(--cream);color:var(--ink);font-size:13px;font-weight:600;padding:10px 18px;border-radius:99px;
+    box-shadow:0 10px 30px rgba(0,0,0,.45);animation:toastIn .3s cubic-bezier(.2,.9,.3,1.2) both;white-space:nowrap}
+  @keyframes toastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .toast.out{opacity:0;transform:translateY(8px);transition:.4s}
+
+  @media(max-width:560px){
+    .rec,.top-actions{min-width:0}
+    .rec-time{display:none}
+    .brand{font-size:12px;letter-spacing:.2em;text-indent:.2em}
+    .icon-btn{width:34px;height:34px}
+    .ticket{flex-direction:column}
+    .ticket-stub{width:100%;flex-direction:row;border-right:0;border-bottom:2px dashed #b39a80;padding:12px 16px}
+    .ticket-stub::before{top:calc(50% - 8px);left:-8px;right:auto}
+    .ticket-stub::after{top:calc(50% - 8px);right:-8px;bottom:auto}
+    .stub-label{writing-mode:horizontal-tb;margin:0 0 0 14px}
+    .barcode{width:70px;height:26px}
+    .ticket-task{padding:18px 2px}
+  }
+</style>
+</head>
+<body>
+  <div class="grain"></div>
+  <div class="vignette"></div>
+
+  <header class="top">
+    <div class="rec"><span class="rec-dot"></span>REC<span class="rec-time" id="recTime">00:00:00</span></div>
+    <div class="brand">Вечерний сеанс</div>
+    <div class="top-actions">
+      <button class="icon-btn" id="soundBtn" aria-label="Звук">
+        <i data-lucide="volume-2" id="icoSoundOn"></i>
+        <i data-lucide="volume-x" id="icoSoundOff" style="display:none"></i>
+      </button>
+      <button class="icon-btn" id="settingsBtn" aria-label="Настройки"><i data-lucide="settings-2"></i></button>
+    </div>
+  </header>
+
+  <main>
+    <!-- РУЛЕТКА -->
+    <section class="view" id="viewWheel">
+      <div class="kicker"><span class="kline"></span>кинотеатр на двоих · без права выбора<span class="kline"></span></div>
+      <h1 class="display">Что смотрим сегодня?</h1>
+      <div class="wheel-stage">
+        <div class="spotlight"></div>
+        <div class="wheel-wrap">
+          <svg id="wheelSvg" viewBox="0 0 640 640"></svg>
+          <button class="hub" id="hubBtn"><span id="hubLabel">КРУТИТЬ</span></button>
+          <div class="pointer" id="pointer">
+            <svg viewBox="0 0 40 54" width="40" height="54">
+              <path d="M2 2 H38 L21.5 49 Q20 52 18.5 49 L2 2 Z" fill="#f0dfc8" stroke="#8e1f2e" stroke-width="3" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="session-info">
+        <span>сеанс <b id="sessionNo">1</b></span>
+        <span class="dots" id="progressDots"></span>
+        <span>осталось фильмов: <b id="leftCount">5</b></span>
+      </div>
+      <p class="remain-line">в барабане: <b id="remainList"></b></p>
+    </section>
+
+    <!-- ФИЛЬМ ИДЁТ -->
+    <section class="view" id="viewMovie" hidden>
+      <div class="kicker"><span class="kline"></span>сейчас на экране<span class="kline"></span></div>
+      <h1 class="display" id="movieTitle"></h1>
+      <div class="redline"></div>
+      <p class="whisper" id="movieWhisper"></p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="movieDone"><i data-lucide="clapperboard"></i>Фильм закончился</button>
+        <button class="btn btn-ghost" id="backToWheel"><i data-lucide="rotate-ccw"></i>вернуться к рулетке</button>
+      </div>
+    </section>
+
+    <!-- АНТРАКТ-ЗАДАНИЕ -->
+    <section class="view" id="viewTask" hidden>
+      <div class="kicker"><span class="kline"></span>антракт<span class="kline"></span></div>
+      <div class="ticket" id="ticket">
+        <div class="ticket-stub">
+          <span class="stub-no">№<span id="taskNo">1</span></span>
+          <span class="stub-label">задание</span>
+          <div class="barcode"></div>
+        </div>
+        <div class="ticket-body">
+          <div class="ticket-head"><span>кинотеатр «вечерний сеанс»</span><span>антракт</span></div>
+          <p class="ticket-task" id="taskText"></p>
+          <div class="ticket-foot"><span>билет действителен на двоих</span><i data-lucide="heart"></i></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="rerollTask"><i data-lucide="shuffle"></i>другое задание</button>
+        <button class="btn btn-primary" id="taskDone"><i data-lucide="check"></i>выполнено — крутим дальше</button>
+      </div>
+    </section>
+
+    <!-- ФИНАЛ -->
+    <section class="view" id="viewFinale" hidden>
+      <div class="kicker"><span class="kline"></span>программа исчерпана<span class="kline"></span></div>
+      <h1 class="display">Бис разрешён</h1>
+      <div class="redline"></div>
+      <p class="finale-note">Все фильмы сегодняшней программы разыграны и просмотрены. Свет в зале включать необязательно.</p>
+      <p class="finale-list" id="finaleList"></p>
+      <button class="btn btn-primary" id="newSession"><i data-lucide="sparkles"></i>новый сеанс</button>
+    </section>
+  </main>
+
+  <!-- РЕЗУЛЬТАТ СПИНА -->
+  <div class="overlay" id="resultOverlay" hidden>
+    <div class="frame">
+      <span class="corner c1"></span><span class="corner c2"></span>
+      <span class="corner c3"></span><span class="corner c4"></span>
+      <div class="frame-kicker">барабаны остановились</div>
+      <div class="frame-title" id="resultTitle"></div>
+      <div class="frame-sub">программа утверждена рулеткой — возражения не принимаются</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="acceptMovie"><i data-lucide="play"></i>включаем</button>
+        <button class="btn btn-ghost" id="respin"><i data-lucide="rotate-ccw"></i>не, крутим ещё</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- НАСТРОЙКИ -->
+  <div class="overlay" id="settingsModal" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Программка вечера</h2>
+        <button class="icon-btn" id="closeSettings" aria-label="Закрыть"><i data-lucide="x"></i></button>
+      </div>
+      <label for="filmsInput">фильмы — по одному в строке</label>
+      <textarea id="filmsInput" rows="6" spellcheck="false"></textarea>
+      <label for="tasksInput">задания на антракт</label>
+      <textarea id="tasksInput" rows="9" spellcheck="false"></textarea>
+      <p class="hint">сохранение начнёт новый сеанс — рулетка соберётся заново</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="resetDefaults">заводская программка</button>
+        <button class="btn btn-primary" id="saveSettings">сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ─────────── данные по умолчанию ─────────── */
+const DEFAULT_FILMS = [
+  'Глинноликий',
+  'Как ограбить банк',
+  'Обсессия',
+  'Очень страшное кино',
+  'Гантерленд'
+];
+
+const DEFAULT_TASKS = [
+  'Обнимитесь и постойте так полминуты в полной тишине',
+  'Поцелуй на десять секунд. Глаза закрыты, руки свободны',
+  'Укуси её за шею — нежно, но так, чтобы мурашки',
+  'Поцелуйте туда, куда партнёр покажет пальцем',
+  'Снимите с партнёра один предмет одежды. Медленно',
+  'Массаж плеч и шеи — одна минута, без спешки',
+  'Прошепчите партнёру на ухо самое смелое желание этого вечера',
+  'Целуйтесь, пока один из вас не рассмеётся',
+  'Посмотрите друг другу в глаза шестьдесят секунд. Кто отвёл — тот проиграл',
+  'Поцелуй в запястье. Медленно, глядя в глаза',
+  'Проведите кончиками пальцев по спине партнёра — от шеи до поясницы',
+  'Укусите партнёра за мочку уха',
+  'Поцелуйте шею там, где бьётся пульс',
+  'Одна минута поцелуев без рук — руки за спиной',
+  'Расскажите партнёру, за что вы хотите его прямо сейчас',
+  'Медленный танец под финальные титры',
+  'Покормите друг друга с рук чем-нибудь вкусным',
+  'Скажите партнёру три вещи, которые сводят вас с ума',
+  'Слегка возьмите партнёра за шею и поцелуйте',
+  'Загадайте желание — партнёр обязан выполнить его сегодня же'
+];
+
+const WHISPERS = [
+  'свет — притушить, телефоны — беззвучно, плед — на двоих',
+  'место в этом кинотеатре одно на двоих. подсаживайся ближе',
+  'во время фильма разрешается не смотреть в экран. вообще',
+  'пауза нажимается только по обоюдному согласию. и то — зачем?',
+  'титры можно промотать. всё остальное — медленно',
+  'если страшно — можно закрыть глаза. или закрыть глаза партнёру ладонью'
+];
+
+/* ─────────── утилиты ─────────── */
+const $ = id => document.getElementById(id);
+const RAD = Math.PI/180;
+const mod = (a,b) => ((a%b)+b)%b;
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const escapeHtml = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+function toast(msg){
+  const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
+  $('toastWrap').appendChild(el);
+  setTimeout(()=>el.classList.add('out'),2200);
+  setTimeout(()=>el.remove(),2700);
+}
+
+/* ─────────── состояние ─────────── */
+const LS_KEY='vecherny-seans-v1';
+let films, tasks, seen, sessionNo, muted;
+let deck=[], taskIssued=0, currentFilm=null, lastFilm=null, prevTask='';
+let rot = Math.random()*360;   // текущий угол колеса
+let spinning = false;
+
+function loadState(){
+  let s=null; try{ s=JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){}
+  films  = (s && Array.isArray(s.films)  && s.films.length)  ? s.films  : [...DEFAULT_FILMS];
+  tasks  = (s && Array.isArray(s.tasks)  && s.tasks.length)  ? s.tasks  : [...DEFAULT_TASKS];
+  seen   = new Set((s && Array.isArray(s.seen)) ? s.seen.filter(f=>films.includes(f)) : []);
+  sessionNo = (s && s.sessionNo) ? s.sessionNo : 1;
+  muted  = !!(s && s.muted);
+  deck = shuffle([...tasks.keys()]); // колода заданий — без повторов, пока не иссякнет
+}
+function saveState(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify({films,tasks,seen:[...seen],sessionNo,muted})); }catch(e){}
+}
+const remaining = () => films.filter(f => !seen.has(f));
+
+/* ─────────── звук (WebAudio, создаётся по первому клику) ─────────── */
+let ac=null, master=null;
+function ensureAudio(){
+  if(!ac){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    ac = new AC(); master = ac.createGain(); master.gain.value=.85; master.connect(ac.destination);
+  }
+  if(ac.state==='suspended') ac.resume();
+}
+function tone(freq,dur,type,vol,delay=0,slide){
+  if(!ac || muted) return;
+  const t=ac.currentTime+delay, o=ac.createOscillator(), g=ac.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  if(slide) o.frequency.exponentialRampToValueAtTime(slide,t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+.02);
+}
+const tickSound = () => tone(1900,.045,'square',.07,0,700);            // щелчок флажка
+const winSound  = () => { tone(440,.4,'sine',.09,0); tone(554.37,.4,'sine',.09,.12); tone(659.25,.6,'sine',.09,.24); };
+
+/* ─────────── сборка колеса (SVG) ─────────── */
+const svg = $('wheelSvg');
+const hubBtn = $('hubBtn'), hubLabel = $('hubLabel'), pointerEl = $('pointer');
+
+function buildWheel(){
+  const list = remaining(), N = Math.max(list.length,1), w = 360/N;
+  const C=320, R=252, TR=178;
+  const secCls = i => N===1 ? 'a' : (N%2===1 && i===N-1 ? 'c' : (i%2 ? 'b' : 'a'));
+
+  let h = `<circle cx="${C}" cy="${C}" r="306" fill="#0d0708"/>`;
+  h += `<g id="rotor" transform="rotate(${rot.toFixed(3)} ${C} ${C})">`;
+
+  // сектора
+  for(let i=0;i<N;i++){
+    const cls = secCls(i);
+    if(N===1){
+      h += `<circle cx="${C}" cy="${C}" r="${R}" class="sec sec-${cls}" data-i="0"/>`;
+    }else{
+      const a0=(i*w-90)*RAD, a1=((i+1)*w-90)*RAD;
+      h += `<path class="sec sec-${cls}" data-i="${i}" d="M ${C} ${C} L ${(C+R*Math.cos(a0)).toFixed(2)} ${(C+R*Math.sin(a0)).toFixed(2)} A ${R} ${R} 0 ${w>180?1:0} 1 ${(C+R*Math.cos(a1)).toFixed(2)} ${(C+R*Math.sin(a1)).toFixed(2)} Z"/>`;
+    }
+  }
+
+  // названия — по дуге каждого сектора (у победителя текст всегда читается у указателя)
+  for(let i=0;i<N;i++){
+    const cls=secCls(i), name=list[i], tcls = cls==='a' ? 't-dark' : 't-light';
+    if(N===1){
+      h += `<text class="wtxt ${tcls}" x="${C}" y="${C}" dy="9" text-anchor="middle" font-size="28">${escapeHtml(name)}</text>`;
+      continue;
+    }
+    const pad = Math.min(6, w*.08), span = Math.min(w-pad*2, 150);
+    const mid = (-90+(i+.5)*w)*RAD;
+    const m0 = mid - span/2*RAD, m1 = mid + span/2*RAD;
+    const arcLen = TR*span*RAD;
+    const fs = clamp(arcLen/(name.length*.6), 13, 24).toFixed(1);
+    h += `<path id="arc${i}" fill="none" d="M ${(C+TR*Math.cos(m0)).toFixed(2)} ${(C+TR*Math.sin(m0)).toFixed(2)} A ${TR} ${TR} 0 0 1 ${(C+TR*Math.cos(m1)).toFixed(2)} ${(C+TR*Math.sin(m1)).toFixed(2)}"/>`;
+    h += `<text class="wtxt ${tcls}" font-size="${fs}"><textPath href="#arc${i}" xlink:href="#arc${i}" startOffset="50%" text-anchor="middle">${escapeHtml(name)}</textPath></text>`;
+  }
+
+  // обод-плёнка с перфорацией (вращается вместе с колесом)
+  h += `<circle cx="${C}" cy="${C}" r="278" fill="none" stroke="#170d10" stroke-width="46"/>`;
+  const holes = 48;
+  for(let k=0;k<holes;k++){
+    const a=k*360/holes*RAD, x=C+Math.cos(a)*278, y=C+Math.sin(a)*278;
+    h += `<rect x="${(x-4).toFixed(2)}" y="${(y-10).toFixed(2)}" width="8" height="20" rx="4" fill="#c7ae8c" opacity=".85" transform="rotate(${(a/RAD+90).toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)})"/>`;
+  }
+  h += `</g>`;
+  h += `<circle cx="${C}" cy="${C}" r="305" fill="none" stroke="#331c23" stroke-width="3"/>`;
+  h += `<circle cx="${C}" cy="${C}" r="296" fill="none" stroke="rgba(240,223,200,.18)" stroke-width="1"/>`;
+
+  svg.innerHTML = h;
+}
+
+/* ─────────── вращение ─────────── */
+const sectorAt = (r,w) => Math.floor(mod(-r,360)/w);
+
+function markWon(i){ const el = svg.querySelector(`.sec[data-i="${i}"]`); if(el) el.classList.add('won'); }
+function clearWon(){ svg.querySelectorAll('.sec.won').forEach(e=>e.classList.remove('won')); }
+function kickPointer(){ pointerEl.classList.remove('kick'); void pointerEl.offsetWidth; pointerEl.classList.add('kick'); }
+
+function doSpin(){
+  if(spinning) return;
+  const list = remaining();
+  if(!list.length) return;
+  ensureAudio();
+  spinning = true;
+  hubBtn.classList.add('is-spinning'); hubLabel.textContent='· · ·';
+  clearWon();
+
+  const N=list.length, w=360/N;
+  const j = Math.floor(Math.random()*N);                                  // победитель выбирается заранее
+  const jitter = (Math.random()-.5)*(w-14);                               // случайное смещение внутри сектора
+  const targetMod = mod(-((j+.5)*w + jitter), 360);
+  let d = targetMod - mod(rot,360); if(d<=0) d+=360;
+  const total = 360*(4+Math.floor(Math.random()*3)) + d;                  // 4–6 оборотов + доворот
+  const start = rot, dur = 4400 + Math.random()*900, t0 = performance.now();
+  const ease = t => 1 - Math.pow(1-t,4);
+  let last = sectorAt(rot,w);
+
+  function frame(now){
+    const t = Math.min(1,(now-t0)/dur);
+    rot = start + total*ease(t);
+    const r = document.getElementById('rotor');
+    if(r) r.setAttribute('transform', `rotate(${rot.toFixed(3)} 320 320)`);
+    const s = sectorAt(rot,w);
+    if(s!==last){ last=s; tickSound(); kickPointer(); }                   // щелчок на каждой границе сектора
+    if(t<1) requestAnimationFrame(frame);
+    else{
+      spinning=false;
+      hubBtn.classList.remove('is-spinning'); hubLabel.textContent='КРУТИТЬ';
+      markWon(j); winSound();
+      setTimeout(()=>showResult(list[j]), 450);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ─────────── вьюхи ─────────── */
+function showView(name){
+  ['Wheel','Movie','Task','Finale'].forEach(n => { $('view'+n).hidden = (n!==name); });
+}
+
+function showResult(film){
+  lastFilm = film;
+  const title = $('resultTitle'); title.innerHTML='';
+  [...film].forEach((ch,i)=>{
+    const s=document.createElement('span');
+    s.textContent = ch===' ' ? '\u00A0' : ch;
+    s.style.animationDelay = (120+i*55)+'ms';
+    title.appendChild(s);
+  });
+  $('resultOverlay').hidden = false;
+}
+
+ $('acceptMovie').onclick = () => {
+  $('resultOverlay').hidden = true;
+  seen.add(lastFilm); currentFilm = lastFilm; saveState();
+  openMovie();
+};
+ $('respin').onclick = () => { $('resultOverlay').hidden = true; doSpin(); };
+
+function openMovie(){
+  $('movieTitle').textContent = currentFilm;
+  $('movieWhisper').textContent = WHISPERS[Math.floor(Math.random()*WHISPERS.length)];
+  updateMeta(); showView('Movie');
+}
+ $('movieDone').onclick  = () => openTask();
+ $('backToWheel').onclick = () => {
+  seen.delete(currentFilm); currentFilm=null; saveState();
+  buildWheel(); updateMeta(); showView('Wheel');
+};
+
+/* ─────────── задания-билеты ─────────── */
+function nextTask(){
+  if(!deck.length) deck = shuffle([...tasks.keys()]);
+  let idx = deck.pop();
+  if(tasks[idx]===prevTask && deck.length){        // не два одинаковых подряд
+    const alt = deck.pop(); deck.push(idx); idx = alt;
+  }
+  prevTask = tasks[idx];
+  return tasks[idx];
+}
+function dealTicket(){
+  const tk = $('ticket');
+  tk.classList.remove('deal'); void tk.offsetWidth; tk.classList.add('deal');
+}
+function openTask(){
+  taskIssued++;
+  $('taskNo').textContent = taskIssued;
+  $('taskText').textContent = nextTask();
+  dealTicket(); showView('Task');
+}
+ $('rerollTask').onclick = () => { $('taskText').textContent = nextTask(); dealTicket(); };
+ $('taskDone').onclick = () => {
+  currentFilm = null;
+  if(!remaining().length){ saveState(); showFinale(); return; }
+  buildWheel(); updateMeta(); saveState(); showView('Wheel');
+};
+
+/* ─────────── финал и новый сеанс ─────────── */
+function showFinale(){
+  $('finaleList').textContent = films.join(' · ');
+  showView('Finale');
+}
+ $('newSession').onclick = () => {
+  seen.clear(); sessionNo++; deck=shuffle([...tasks.keys()]); taskIssued=0;
+  saveState(); buildWheel(); updateMeta(); showView('Wheel');
+  toast('новый сеанс — поехали');
+};
+
+/* ─────────── метаданные вечера ─────────── */
+function updateMeta(){
+  $('sessionNo').textContent = sessionNo;
+  const left = remaining();
+  $('leftCount').textContent = left.length;
+  const dots = $('progressDots'); dots.innerHTML='';
+  films.forEach(f=>{
+    const s=document.createElement('span');
+    s.className='dot'+(seen.has(f)?' done':''); s.title=f;
+    dots.appendChild(s);
+  });
+  $('remainList').textContent = left.length ? left.join(' · ') : '—';
+}
+
+/* ─────────── настройки ─────────── */
+const settings = $('settingsModal');
+ $('settingsBtn').onclick = () => {
+  $('filmsInput').value = films.join('\n');
+  $('tasksInput').value = tasks.join('\n');
+  settings.hidden = false;
+};
+ $('closeSettings').onclick = () => settings.hidden = true;
+settings.addEventListener('click', e => { if(e.target===settings) settings.hidden=true; });
+document.addEventListener('keydown', e => { if(e.key==='Escape') settings.hidden=true; });
+
+function applyProgram(newFilms, newTasks, resetSession){
+  films=newFilms; tasks=newTasks; seen.clear();
+  if(resetSession){ sessionNo=1; } else { sessionNo++; }
+  deck=shuffle([...tasks.keys()]); taskIssued=0; prevTask='';
+  saveState(); buildWheel(); updateMeta(); showView('Wheel'); settings.hidden=true;
+}
+ $('saveSettings').onclick = () => {
+  const f = $('filmsInput').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const t = $('tasksInput').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!f.length || !t.length){ toast('нужен хотя бы один фильм и одно задание'); return; }
+  applyProgram(f,t,false);
+  toast('программка обновлена — начинаем новый сеанс');
+};
+ $('resetDefaults').onclick = () => {
+  applyProgram([...DEFAULT_FILMS],[...DEFAULT_TASKS],true);
+  toast('вернул заводскую программку');
+};
+
+/* ─────────── звук вкл/выкл ─────────── */
+function applyMuteIcon(){
+  $('icoSoundOn').style.display  = muted ? 'none' : '';
+  $('icoSoundOff').style.display = muted ? '' : 'none';
+}
+ $('soundBtn').onclick = () => {
+  muted = !muted; saveState(); applyMuteIcon();
+  toast(muted ? 'звук выключен' : 'звук включён');
+};
+
+/* ─────────── таймкод камеры ─────────── */
+const camStart = Date.now();
+setInterval(()=>{
+  const s = Math.floor((Date.now()-camStart)/1000), p = n => String(n).padStart(2,'0');
+  $('recTime').textContent = `${p(Math.floor(s/3600))}:${p(Math.floor(s/60)%60)}:${p(s%60)}`;
+},1000);
+
+/* ─────────── запуск ─────────── */
+loadState();
+applyMuteIcon();
+buildWheel();
+updateMeta();
+if(!remaining().length && films.length) showFinale(); else showView('Wheel');
+hubBtn.addEventListener('click', doSpin);
+try{ lucide.createIcons(); }catch(e){}
+})();
+</script>
+</body>
+</html>
